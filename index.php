@@ -1,6 +1,6 @@
 <?php
 // 设置API路径
-define('API_URI', 'https://api.injahow.cn/meting/');
+define('API_URI', siteURL());
 // 设置中文歌词
 define('LYRIC_CN', true);
 // 设置文件缓存及时间
@@ -10,13 +10,28 @@ define('CACHE_TIME', 86400);
 define('AUTH', false);
 define('AUTH_SECRET', 'meting-secret');
 
+
+function siteURL()
+{
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+    $domainName = $_SERVER['HTTP_HOST'];
+    $phpSelf = $_SERVER['PHP_SELF'];
+    if (strstr($phpSelf, 'index.php') != false) {
+        $phpSelf = str_replace('index.php', '', $phpSelf);
+    }
+    $domainName = $domainName.$phpSelf;
+    return $protocol.$domainName;
+}
+
 function auth($name)
 {
     return hash_hmac('sha1', $name, AUTH_SECRET);
 }
 
 if (!isset($_GET['type']) || !isset($_GET['id'])) {
-    include __DIR__ . '/public/index.html';
+    header('HTTP/1.1 404 Not Found');
+    header('Content-type: application/json');
+    echo '{"error":"404 Not Found"}';
     exit;
 }
 
@@ -26,7 +41,7 @@ $id = $_GET['id'];
 
 if (AUTH) {
     $auth = isset($_GET['auth']) ? $_GET['auth'] : '';
-    if (in_array($type, ['url', 'cover', 'lrc'])) {
+    if (in_array($type, ['url', 'pic', 'lrc'])) {
         if ($auth == '' || $auth != auth($server . $type . $id)) {
             http_response_code(403);
             exit;
@@ -61,7 +76,6 @@ if ($server == 'netease') {
 }*/
 
 if ($type == 'playlist') {
-
     if (CACHE) {
         $file_path = __DIR__ . '/cache/playlist/' . $server . '_' . $id . '.json';
         if (file_exists($file_path)) {
@@ -81,10 +95,10 @@ if ($type == 'playlist') {
     $playlist = [];
     foreach ($data as $song) {
         $playlist[] = array(
-            'name'   => $song->name,
-            'artist' => implode('/', $song->artist),
+            'title'   => $song->name,
+            'author' => implode('/', $song->artist),
             'url'    => API_URI . '?server=' . $song->source . '&type=url&id=' . $song->url_id . (AUTH ? '&auth=' . auth($song->source . 'url' . $song->url_id) : ''),
-            'cover'  => API_URI . '?server=' . $song->source . '&type=cover&id=' . $song->url_id . (AUTH ? '&auth=' . auth($song->source . 'cover' . $song->url_id) : ''),
+            'pic'  => API_URI . '?server=' . $song->source . '&type=pic&id=' . $song->url_id . (AUTH ? '&auth=' . auth($song->source . 'pic' . $song->url_id) : ''),
             'lrc'    => API_URI . '?server=' . $song->source . '&type=lrc&id=' . $song->url_id . (AUTH ? '&auth=' . auth($song->source . 'lrc' . $song->url_id) : '')
         );
     }
@@ -96,7 +110,6 @@ if ($type == 'playlist') {
     }
     echo $playlist;
 } else {
-
     $song = $api->song($id);
     if ($song == '[]') {
         echo '{"error":"unknown song id"}';
@@ -106,11 +119,11 @@ if ($type == 'playlist') {
     $song = json_decode($song)[0];
 
     switch ($type) {
-        case 'name':
+        case 'title':
             echo $song->name;
             break;
 
-        case 'artist':
+        case 'author':
             echo implode('/', $song->artist);
             break;
 
@@ -122,7 +135,7 @@ if ($type == 'playlist') {
             header('Location: ' . $m_url);
             break;
 
-        case 'cover':
+        case 'pic':
             $c_url = json_decode($api->pic($song->pic_id, 90))->url;
             header('Location: ' . $c_url);
             break;
@@ -143,13 +156,17 @@ if ($type == 'playlist') {
                 $lrc_cn_arr = explode("\n", $lrc_data->tlyric);
                 $lrc_cn_map = [];
                 foreach ($lrc_cn_arr as $i => $v) {
-                    if ($v == '') continue;
+                    if ($v == '') {
+                        continue;
+                    }
                     $line = explode(']', $v);
                     $lrc_cn_map[$line[0]] = $line[1];
                     unset($lrc_cn_arr[$i]);
                 }
                 foreach ($lrc_arr as $i => $v) {
-                    if ($v == '') continue;
+                    if ($v == '') {
+                        continue;
+                    }
                     $key = explode(']', $v)[0];
                     if (!empty($lrc_cn_map[$key]) && $lrc_cn_map[$key] != '//') {
                         $lrc_arr[$i] .= ' (' . $lrc_cn_map[$key] . ')';
@@ -165,10 +182,10 @@ if ($type == 'playlist') {
 
         case 'single':
             $single = array(
-                'name'   => $song->name,
-                'artist' => implode('/', $song->artist),
+                'title'   => $song->name,
+                'author' => implode('/', $song->artist),
                 'url'    => API_URI . '?server=' . $song->source . '&type=url&id=' . $song->url_id . (AUTH ? '&auth=' . auth($song->source . 'url' . $song->url_id) : ''),
-                'cover'  => API_URI . '?server=' . $song->source . '&type=cover&id=' . $song->url_id . (AUTH ? '&auth=' . auth($song->source . 'cover' . $song->url_id) : ''),
+                'pic'  => API_URI . '?server=' . $song->source . '&type=pic&id=' . $song->url_id . (AUTH ? '&auth=' . auth($song->source . 'pic' . $song->url_id) : ''),
                 'lrc'    => API_URI . '?server=' . $song->source . '&type=lrc&id=' . $song->url_id . (AUTH ? '&auth=' . auth($song->source . 'lrc' . $song->url_id) : '')
             );
             echo json_encode($single);
